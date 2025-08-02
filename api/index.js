@@ -1,46 +1,38 @@
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, '..')));
 
-const urlsDbPath = path.join(__dirname, 'urls.json');
+// In-memory storage for Vercel (since file system is read-only)
+let urls = {};
 
-// Helper function to get URLs from the DB
+// Helper function to get URLs
 const getUrls = () => {
-    if (!fs.existsSync(urlsDbPath)) {
-        fs.writeFileSync(urlsDbPath, JSON.stringify({}));
-    }
-    const data = fs.readFileSync(urlsDbPath);
-    return JSON.parse(data);
+    return urls;
 };
 
-// Helper function to save URLs to the DB
+// Helper function to save URLs
 const saveUrl = (slug, url) => {
-    const urls = getUrls();
     urls[slug] = url;
-    fs.writeFileSync(urlsDbPath, JSON.stringify(urls, null, 2));
 };
 
 // Serve static files
 app.get('/style.css', (req, res) => {
-    res.sendFile(path.join(__dirname, 'style.css'));
+    res.sendFile(path.join(__dirname, '..', 'style.css'));
 });
 
 app.get('/script.js', (req, res) => {
-    res.sendFile(path.join(__dirname, 'script.js'));
+    res.sendFile(path.join(__dirname, '..', 'script.js'));
 });
 
 // Serve the main page
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
 // Shorten URL
@@ -50,10 +42,10 @@ app.post('/shorten', (req, res) => {
         return res.status(400).json({ error: 'URL is required' });
     }
 
-    const urls = getUrls();
+    const currentUrls = getUrls();
     const newSlug = slug || Math.random().toString(36).substring(2, 8);
 
-    if (urls[newSlug]) {
+    if (currentUrls[newSlug]) {
         return res.status(400).json({ error: 'Slug already in use' });
     }
 
@@ -63,9 +55,9 @@ app.post('/shorten', (req, res) => {
 
 // Redirect
 app.get('/:slug', (req, res) => {
-    const urls = getUrls();
+    const currentUrls = getUrls();
     const { slug } = req.params;
-    const url = urls[slug];
+    const url = currentUrls[slug];
 
     if (url) {
         res.redirect(url);
@@ -74,9 +66,4 @@ app.get('/:slug', (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
-
-// Export for Vercel
 module.exports = app;
